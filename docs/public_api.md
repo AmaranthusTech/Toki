@@ -86,12 +86,3 @@ get_calendar_range(start: str|date, end: str|date, *, tz="Asia/Tokyo", ephemeris
 }
 ```
 
-## 参照データ突合（pytest）
-- 参照ファイル: `mnt/data/高精度計算サイト_2016_2034.txt`
-- 主要比較: 旧暦（年月日/閏）、六曜、節気(JST日付)
-
-### 実行例
-```bash
-python tests/compare_sekki_greg_range.py --ref mnt/data/高精度計算サイト_2016_2034.txt --greg-start 2017/06/01 --greg-end 2017/09/30 --day-basis jst --ephemeris de440s.bsp --sample-policy end
-pytest tests/test_public_api_calendar.py -q
-```
