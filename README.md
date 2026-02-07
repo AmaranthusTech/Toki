@@ -141,7 +141,9 @@ pytest -q
 
 ## Documentation
 - [Public API spec](docs/public_api.md)
-
+- Examples: docs/examples.md
+- Cleanup notes (what’s excluded from release): docs/cleanup.md
+  
 ## Development Notes
 - 日付帰属は **JST日付境界** を正とする（UTC基準に戻さない）。
 
