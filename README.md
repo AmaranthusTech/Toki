@@ -5,7 +5,7 @@
 
 > Package name remains `jcal` (internal module), but the public project name is **Toki**.
 
-![CI](https://github.com/<owner>/Toki/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/AmaranthusTech/Toki/actions/workflows/ci.yml/badge.svg)
 
 ## Features
 - 旧暦（閏月ラベル含む）
