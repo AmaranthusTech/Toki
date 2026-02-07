@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.egg
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Virtual env
+.venv/
+venv/
+.env/
+.env.*
+
+# Logs
+*.log
+
+# OS
+tests/.DS_Store
+.DS_Store
+
+# Ephemeris (large binary)
+*.bsp
+data/*.bsp
+
+# Local reference data (not redistributed)
+mnt/data/高精度計算サイト_2016_2034.txt
+sekki24_2016_2020.json
