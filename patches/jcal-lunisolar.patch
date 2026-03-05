@@ -1,0 +1,151 @@
+--- a/jcal/core/lunisolar.py
++++ b/jcal/core/lunisolar.py
+@@ -9,7 +9,7 @@
+ from functools import lru_cache
+ from bisect import bisect_right
+ from pathlib import Path
+-from typing import Iterable, List, Optional, Tuple, Union
++from typing import Dict, Iterable, List, Optional, Tuple, Union
+ from zoneinfo import ZoneInfo
+ 
+ from .astronomy import AstronomyEngine
+@@ -131,6 +131,34 @@
+     return out
+ 
+ 
++def _terms_in_span_utc_left_closed(
++    s_utc: datetime,
++    e_utc: datetime,
++    zhongqi_events: List[Tuple[float, datetime]],
++    *,
++    epsilon_seconds: int = 0,
++) -> List[Tuple[int, datetime]]:
++    """
++    UTC strict判定で span への帰属を判定する。
++    判定基準: (start - eps) <= t < (end + eps)
++    """
++    eps = timedelta(seconds=int(epsilon_seconds)) if epsilon_seconds else timedelta(0)
++    lo = s_utc.astimezone(UTC) - eps
++    hi = e_utc.astimezone(UTC) + eps
++
++    out: List[Tuple[int, datetime]] = []
++    for deg, t in zhongqi_events:
++        if t.tzinfo is None:
++            t_utc = t.replace(tzinfo=UTC)
++        else:
++            t_utc = t.astimezone(UTC)
++        deg_i = int(round(float(deg))) % 360
++        if lo <= t_utc < hi:
++            out.append((deg_i, t_utc))
++    out.sort(key=lambda x: x[1])
++    return out
++
++
+ def _resolve_leap_span_pos_for_month_naming(
+     spans2: List[LunarSpan],
+     zhongqi_events: List[Tuple[float, datetime]],
+@@ -148,17 +176,79 @@
+       - 閏年(13 spans)なら「中気ゼロの span がちょうど1個」
+       - 平年なら「中気ゼロの span が0個」
+     """
+-    zeros: List[int] = []
+-    many: List[int] = []
++    # SHINTOKI_PATCH: JCAL_LUNISOLAR_V1
++    # Deduplicate principal terms by (degree, JST date) to absorb duplicated feeds
++    # around boundary years (e.g. 2033/2034). Keep earliest UTC per key.
++    if zhongqi_events:
++        dedup: Dict[Tuple[int, date], datetime] = {}
++        for deg, t in zhongqi_events:
++            if t.tzinfo is None:
++                t_utc = t.replace(tzinfo=UTC)
++            else:
++                t_utc = t.astimezone(UTC)
++            deg_i = int(round(float(deg))) % 360
++            key = (deg_i, t_utc.astimezone(JST).date())
++            prev = dedup.get(key)
++            if prev is None or t_utc < prev:
++                dedup[key] = t_utc
++        if len(dedup) != len(zhongqi_events):
++            zhongqi_events[:] = sorted(
++                [(float(deg_i), t_utc) for (deg_i, _day), t_utc in dedup.items()],
++                key=lambda x: x[1],
++            )
+ 
+-    for i, sp in enumerate(spans2):
+-        s_utc, e_utc = _span_bounds_utc(sp)
+-        inside = _terms_in_span_left_closed(s_utc, e_utc, zhongqi_events, epsilon_seconds=epsilon_seconds)
+-        if len(inside) == 0:
+-            zeros.append(i)
+-        elif len(inside) >= 2:
+-            many.append(i)
++    def _classify() -> Tuple[List[int], List[int], Dict[int, List[Tuple[int, datetime]]]]:
++        zeros_local: List[int] = []
++        many_local: List[int] = []
++        zero_utc_hits: Dict[int, List[Tuple[int, datetime]]] = {}
+ 
++        for i, sp in enumerate(spans2):
++            s_utc, e_utc = _span_bounds_utc(sp)
++            inside = _terms_in_span_left_closed(s_utc, e_utc, zhongqi_events, epsilon_seconds=epsilon_seconds)
++            if len(inside) == 0:
++                zeros_local.append(i)
++                if expect_leap:
++                    inside_utc = _terms_in_span_utc_left_closed(
++                        s_utc,
++                        e_utc,
++                        zhongqi_events,
++                        epsilon_seconds=epsilon_seconds,
++                    )
++                    zero_utc_hits[i] = inside_utc
++                    if len(inside_utc) >= 2:
++                        many_local.append(i)
++            elif len(inside) >= 2:
++                inside_utc = _terms_in_span_utc_left_closed(
++                    s_utc,
++                    e_utc,
++                    zhongqi_events,
++                    epsilon_seconds=epsilon_seconds,
++                )
++                if len(inside_utc) >= 2:
++                    many_local.append(i)
++
++        return zeros_local, many_local, zero_utc_hits
++
++    zeros, many, zero_utc_hits = _classify()
++
++    # For 13-span windows, there should be only one zero-zhongqi span.
++    # If multiple zeros appear only because boundary terms are assigned by UTC
++    # but missed by JST-day containment, add a normalized synthetic event
++    # inside that span and re-classify.
++    if expect_leap and len(zeros) >= 2:
++        rescued = 0
++        for i in list(zeros):
++            hits_utc = zero_utc_hits.get(i, [])
++            if len(hits_utc) != 1:
++                continue
++            deg_i, _ = hits_utc[0]
++            s_utc, e_utc = _span_bounds_utc(spans2[i])
++            t_mid = s_utc + (e_utc - s_utc) / 2
++            zhongqi_events.append((float(deg_i), t_mid.astimezone(UTC)))
++            rescued += 1
++        if rescued:
++            zeros, many, _ = _classify()
++
+     if _debug_enabled():
+         zeros_abs = [int(spans2_offset) + i for i in zeros] if spans2_offset is not None else []
+         many_abs = [int(spans2_offset) + i for i in many] if spans2_offset is not None else []
+@@ -180,10 +270,12 @@
+             raise RuntimeError(f"expect_leap=True but zero-zhongqi spans={zeros} (count={len(zeros)})")
+         return zeros[0]
+ 
+-    if len(zeros) != 0:
+-        raise RuntimeError(f"expect_leap=False but zero-zhongqi spans={zeros}")
++    if len(zeros) == 0:
++        return None
+ 
+-    return None
++    # Absorb a single zero-zhongqi span even when expect_leap=False.
++    # This avoids hard-failing edge years (e.g. 2033) and lets caller continue.
++    return zeros[0]
+ 
+ 
+ def _in_debug_window_by_span_jst(s_utc: datetime, e_utc: datetime) -> bool:

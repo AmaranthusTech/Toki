@@ -1,0 +1,13 @@
+{
+  "date": "2017-06-09",
+  "tz": "Asia/Tokyo",
+  "lunar": {
+    "year": 2017,
+    "month": 5,
+    "day": 15,
+    "is_leap": false
+  },
+  "rokuyo": "先勝",
+  "sekki": [],
+  "issues": []
+}

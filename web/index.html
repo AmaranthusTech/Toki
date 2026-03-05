@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ShinToki Demo Frontend</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --fg: #1f2937;
+      --muted: #6b7280;
+      --line: #d1d5db;
+      --card: #ffffff;
+      --primary: #0f766e;
+      --danger: #b91c1c;
+      --warn-bg: #fff7ed;
+      --warn-fg: #9a3412;
+      --missing-bg: #fee2e2;
+      --missing-fg: #991b1b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+      color: var(--fg);
+      background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+    }
+    h1 { margin: 0 0 12px; font-size: 22px; }
+    h2 { margin: 0 0 10px; font-size: 18px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+    @media (min-width: 980px) {
+      .grid { grid-template-columns: 1fr 1.2fr; }
+    }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    @media (min-width: 520px) {
+      .row.three { grid-template-columns: 1fr 1fr auto; }
+      .row.two { grid-template-columns: 1fr 1fr; }
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 14px;
+      background: #fff;
+    }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 14px;
+      background: var(--primary);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+      height: 37px;
+      align-self: end;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 8px;
+      background: #fcfcfd;
+    }
+    .card.error {
+      border-color: #fecaca;
+      background: #fff1f2;
+      color: var(--danger);
+    }
+    .card.warn {
+      border-color: #fdba74;
+      background: var(--warn-bg);
+      color: var(--warn-fg);
+    }
+    .kv {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 6px 10px;
+      font-size: 14px;
+    }
+    .kv .k { color: var(--muted); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      text-align: left;
+      padding: 6px;
+      vertical-align: top;
+    }
+    th { background: #f8fafc; }
+    .badge {
+      display: inline-block;
+      border: 1px solid #fca5a5;
+      background: var(--missing-bg);
+      color: var(--missing-fg);
+      font-size: 11px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      margin-left: 6px;
+    }
+    pre {
+      margin: 8px 0 0;
+      border: 1px solid var(--line);
+      background: #0b1220;
+      color: #dbeafe;
+      border-radius: 8px;
+      padding: 10px;
+      max-height: 280px;
+      overflow: auto;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .muted { color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>ShinToki Frontend (Day + Range)</h1>
+  <p class="muted">API base: <code id="apiBase"></code></p>
+  <div class="grid">
+    <section class="panel">
+      <h2>単日</h2>
+      <div class="row three">
+        <div>
+          <label for="dayDate">date</label>
+          <input id="dayDate" type="date">
+        </div>
+        <div>
+          <label for="dayTz">tz</label>
+          <input id="dayTz" type="text" value="Asia/Tokyo">
+        </div>
+        <button id="dayFetch">取得</button>
+      </div>
+      <div id="dayStatus"></div>
+      <pre id="dayRaw"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>期間</h2>
+      <div class="row two">
+        <div>
+          <label for="rangeStart">start</label>
+          <input id="rangeStart" type="date">
+        </div>
+        <div>
+          <label for="rangeEnd">end</label>
+          <input id="rangeEnd" type="date">
+        </div>
+      </div>
+      <div class="row three">
+        <div>
+          <label for="rangeTz">tz</label>
+          <input id="rangeTz" type="text" value="Asia/Tokyo">
+        </div>
+        <div class="muted" style="align-self:end">strict=0 で取得</div>
+        <button id="rangeFetch">取得</button>
+      </div>
+      <div id="rangeStatus"></div>
+      <div id="rangeTableWrap"></div>
+      <pre id="rangeRaw"></pre>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      const API_BASE = window.location.origin + "/Toki/api";
+      const MAX_RANGE_DAYS = 366;
+
+      const el = {
+        apiBase: document.getElementById("apiBase"),
+        dayDate: document.getElementById("dayDate"),
+        dayTz: document.getElementById("dayTz"),
+        dayFetch: document.getElementById("dayFetch"),
+        dayStatus: document.getElementById("dayStatus"),
+        dayRaw: document.getElementById("dayRaw"),
+        rangeStart: document.getElementById("rangeStart"),
+        rangeEnd: document.getElementById("rangeEnd"),
+        rangeTz: document.getElementById("rangeTz"),
+        rangeFetch: document.getElementById("rangeFetch"),
+        rangeStatus: document.getElementById("rangeStatus"),
+        rangeTableWrap: document.getElementById("rangeTableWrap"),
+        rangeRaw: document.getElementById("rangeRaw")
+      };
+
+      el.apiBase.textContent = API_BASE;
+
+      function isoDate(d) {
+        return d.toISOString().slice(0, 10);
+      }
+
+      function plusDays(base, days) {
+        const d = new Date(base);
+        d.setDate(d.getDate() + days);
+        return d;
+      }
+
+      function fmtLunar(lunar) {
+        if (!lunar) return "-";
+        return `${lunar.year}年 ${lunar.month}月 ${lunar.day}日${lunar.is_leap ? " (閏)" : ""}`;
+      }
+
+      function setRaw(target, payload) {
+        target.textContent = JSON.stringify(payload, null, 2);
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function renderDayCard(data, ok) {
+        if (!ok) {
+          const msg = data && data.error ? `${data.error.code || "error"}` : "request_failed";
+          el.dayStatus.innerHTML = `<div class="card error">エラー: ${escapeHtml(msg)}</div>`;
+          return;
+        }
+        const day = data.day || {};
+        const sekki = Array.isArray(day.sekki) ? day.sekki.join(", ") : "";
+        el.dayStatus.innerHTML = `
+          <div class="card">
+            <div class="kv">
+              <div class="k">日付</div><div>${escapeHtml(day.date || "-")}</div>
+              <div class="k">旧暦</div><div>${escapeHtml(fmtLunar(day.lunar))}</div>
+              <div class="k">六曜</div><div>${escapeHtml(day.rokuyo || "-")}</div>
+              <div class="k">節気</div><div>${escapeHtml(sekki || "-")}</div>
+            </div>
+          </div>
+        `;
+      }
+
+      async function fetchDay() {
+        const date = el.dayDate.value;
+        const tz = el.dayTz.value || "Asia/Tokyo";
+        const url = `${API_BASE}/v1/day?date=${encodeURIComponent(date)}&tz=${encodeURIComponent(tz)}`;
+        el.dayStatus.innerHTML = `<div class="card">loading...</div>`;
+        try {
+          const res = await fetch(url);
+          const data = await res.json().catch(() => ({ ok: false, error: { code: "invalid_json" } }));
+          setRaw(el.dayRaw, data);
+          renderDayCard(data, res.status === 200);
+        } catch (err) {
+          const data = { ok: false, error: { code: "network_error", message: String(err) } };
+          setRaw(el.dayRaw, data);
+          renderDayCard(data, false);
+        }
+      }
+
+      function validateRange(start, end) {
+        if (end < start) return "end < start は指定できません";
+        const s = new Date(start + "T00:00:00");
+        const e = new Date(end + "T00:00:00");
+        const diffDays = Math.floor((e - s) / 86400000) + 1;
+        if (diffDays > MAX_RANGE_DAYS) return `期間上限は ${MAX_RANGE_DAYS} 日です`;
+        return "";
+      }
+
+      function renderRangeTable(days) {
+        const rows = (Array.isArray(days) ? days : []).map((d) => {
+          const missing = d.lunar == null;
+          const lunar = missing ? "—" : escapeHtml(fmtLunar(d.lunar));
+          const rokuyo = missing ? "—" : escapeHtml(d.rokuyo || "—");
+          const sekki = Array.isArray(d.sekki) ? escapeHtml(d.sekki.join(", ") || "—") : "—";
+          return `
+            <tr>
+              <td>${escapeHtml(d.date || "-")}${missing ? '<span class="badge">missing</span>' : ""}</td>
+              <td>${lunar}</td>
+              <td>${rokuyo}</td>
+              <td>${sekki}</td>
+            </tr>
+          `;
+        }).join("");
+        el.rangeTableWrap.innerHTML = `
+          <table>
+            <thead>
+              <tr><th>日付</th><th>旧暦</th><th>六曜</th><th>節気（sekki）</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `;
+      }
+
+      function renderRangeStatus(data, ok) {
+        if (!ok) {
+          const msg = data && data.error ? `${data.error.code || "error"}` : "request_failed";
+          el.rangeStatus.innerHTML = `<div class="card error">エラー: ${escapeHtml(msg)}</div>`;
+          el.rangeTableWrap.innerHTML = "";
+          return;
+        }
+
+        const missing = Array.isArray(data.missing) ? data.missing : [];
+        const preview = missing.slice(0, 30).join(", ");
+        if (missing.length > 0) {
+          el.rangeStatus.innerHTML = `
+            <div class="card warn">
+              欠損 ${missing.length} 件
+              ${preview ? `<br>${escapeHtml(preview)}${missing.length > 30 ? " ..." : ""}` : ""}
+            </div>
+          `;
+        } else {
+          el.rangeStatus.innerHTML = `<div class="card">欠損なし</div>`;
+        }
+
+        renderRangeTable(data.days);
+      }
+
+      async function fetchRange() {
+        const start = el.rangeStart.value;
+        const end = el.rangeEnd.value;
+        const tz = el.rangeTz.value || "Asia/Tokyo";
+        const err = validateRange(start, end);
+        if (err) {
+          const data = { ok: false, error: { code: "invalid_range", message: err } };
+          setRaw(el.rangeRaw, data);
+          renderRangeStatus(data, false);
+          return;
+        }
+
+        const url = `${API_BASE}/v1/range?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&tz=${encodeURIComponent(tz)}&strict=0`;
+        el.rangeStatus.innerHTML = `<div class="card">loading...</div>`;
+        try {
+          const res = await fetch(url);
+          const data = await res.json().catch(() => ({ ok: false, error: { code: "invalid_json" } }));
+          setRaw(el.rangeRaw, data);
+          renderRangeStatus(data, res.status === 200);
+        } catch (err2) {
+          const data = { ok: false, error: { code: "network_error", message: String(err2) } };
+          setRaw(el.rangeRaw, data);
+          renderRangeStatus(data, false);
+        }
+      }
+
+      el.dayFetch.addEventListener("click", fetchDay);
+      el.rangeFetch.addEventListener("click", fetchRange);
+
+      const today = new Date();
+      el.dayDate.value = isoDate(today);
+      el.rangeStart.value = isoDate(today);
+      el.rangeEnd.value = isoDate(plusDays(today, 10));
+
+      fetchDay();
+      fetchRange();
+    })();
+  </script>
+</body>
+</html>

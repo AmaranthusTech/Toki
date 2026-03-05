@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shintoki"
+version = "0.2.0"
+description = "ShinToki: lunisolar calculation project skeleton"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "skyfield>=1.49",
+]
+
+[project.optional-dependencies]
+dev = [
+  "black>=24.0.0",
+  "pytest>=8.0.0",
+  "ruff>=0.3.0",
+]
+api = [
+  "fastapi>=0.110.0",
+  "uvicorn>=0.29.0",
+]
+compare = [
+  "jcal @ git+https://github.com/AmaranthusTech/Toki.git",
+]
+
+[project.scripts]
+shintoki = "shintoki.cli:run"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
