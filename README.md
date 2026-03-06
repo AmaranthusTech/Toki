@@ -3,6 +3,20 @@
 旧暦計算プロジェクト（ShinToki）の Python ライブラリ + CLI です。  
 公開用途では `shintoki.public` のAPIを安定面として扱い、`debug-*` は検証用として維持します。
 
+
+## Demo (bloom)
+
+ShinToki DB API を使って「旧暦 / 六曜 / 節気」を表示するデモを公開しています。
+
+- Demo UI: https://bloom.amaranthus.tech/Toki/
+- API Health: https://bloom.amaranthus.tech/Toki/api/health
+- API Day: `GET /Toki/api/v1/day?date=YYYY-MM-DD&tz=Asia/Tokyo`
+- API Range: `GET /Toki/api/v1/range?start=YYYY-MM-DD&end=YYYY-MM-DD&tz=Asia/Tokyo&strict=0`
+
+Notes:
+- 事前計算済みの範囲外は 404（not_found）を返します（運用を固くする方針）。
+
+
 ## Compatibility Policy
 
 - `shintoki.public` は互換維持対象です（シグネチャ/戻り型の破壊変更はメジャー変更扱い）。
